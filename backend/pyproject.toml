@@ -25,11 +25,13 @@ exclude-newer = "7 days"
 [dependency-groups]
 dev = [
     "pytest==9.1.0",
+    "pytest-asyncio==1.4.0",
     "ruff==0.15.17",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
