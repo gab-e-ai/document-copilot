@@ -260,16 +260,26 @@ def upgrade() -> None:
     """)
 
     # ---------- updated_at auto-update triggers ----------
-    op.execute("CREATE EXTENSION IF NOT EXISTS moddatetime")
+    op.execute("""
+        CREATE OR REPLACE FUNCTION public.set_updated_at()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+            NEW.updated_at = now();
+            RETURN NEW;
+        END;
+        $$
+    """)
     op.execute("""
         CREATE TRIGGER set_profiles_updated_at
             BEFORE UPDATE ON profiles
-            FOR EACH ROW EXECUTE FUNCTION extensions.moddatetime(updated_at)
+            FOR EACH ROW EXECUTE FUNCTION public.set_updated_at()
     """)
     op.execute("""
         CREATE TRIGGER set_chat_threads_updated_at
             BEFORE UPDATE ON chat_threads
-            FOR EACH ROW EXECUTE FUNCTION extensions.moddatetime(updated_at)
+            FOR EACH ROW EXECUTE FUNCTION public.set_updated_at()
     """)
 
     # ---------- Grants ----------
@@ -287,7 +297,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP TRIGGER IF EXISTS set_profiles_updated_at ON profiles")
     op.execute("DROP TRIGGER IF EXISTS set_chat_threads_updated_at ON chat_threads")
-    op.execute("DROP EXTENSION IF EXISTS moddatetime")
+    op.execute("DROP FUNCTION IF EXISTS public.set_updated_at()")
     op.execute("DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users")
     op.execute("DROP FUNCTION IF EXISTS public.handle_new_user()")
     op.drop_table("message_citations")

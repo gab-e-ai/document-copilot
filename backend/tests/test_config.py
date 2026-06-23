@@ -15,7 +15,7 @@ def test_settings_loads_with_explicit_values():
     )
     assert s.openai_embedding_model == "text-embedding-3-small"
     assert s.openai_embedding_dimensions == 1536
-    assert s.allowed_origins == ["http://localhost:5173"]
+    assert s.allowed_origins == "http://localhost:5173"
 
 
 def test_settings_missing_required_raises():
@@ -30,7 +30,7 @@ def test_settings_parses_allowed_origins_list():
         supabase_service_role_key="service",
         database_url="postgresql://user:pass@localhost/db",
         openai_api_key="sk-test",
-        allowed_origins=["http://localhost:5173", "http://localhost:3000"],
+        allowed_origins="http://localhost:5173,http://localhost:3000",
         _env_file=None,
     )
-    assert len(s.allowed_origins) == 2
+    assert len(s.allowed_origins.split(",")) == 2

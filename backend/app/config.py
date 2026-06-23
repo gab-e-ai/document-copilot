@@ -1,5 +1,6 @@
 from typing import Tuple, Type
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.main import PydanticBaseSettingsSource
 
@@ -18,7 +19,17 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
-    allowed_origins: list[str] = ["http://localhost:5173"]
+    # Comma-separated string so env files don't need JSON array syntax.
+    # main.py splits this into a list for the CORS middleware.
+    allowed_origins: str = "http://localhost:5173"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def fix_database_url_scheme(cls, v: str) -> str:
+        # Supabase provides postgresql:// URLs; psycopg3 requires postgresql+psycopg://
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+psycopg://", 1)
+        return v
 
     @classmethod
     def settings_customise_sources(
