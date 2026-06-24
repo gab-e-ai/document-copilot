@@ -1,23 +1,27 @@
 import { HttpChatTransport } from 'ai'
 import { useChat } from '@ai-sdk/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { MessageInput } from '../../components/chat/MessageInput'
 import { MessageList } from '../../components/chat/MessageList'
 import { getAccessToken } from '../../lib/api'
 import { env } from '../../lib/env'
 
-const transport = new HttpChatTransport({
-  api: `${env.apiBaseUrl}/chat/stream`,
-  headers: async () => {
-    const token = await getAccessToken()
-    return { Authorization: `Bearer ${token}` }
-  },
-})
-
 export function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
+
+  const transport = useMemo(
+    () =>
+      new HttpChatTransport({
+        api: `${env.apiBaseUrl}/chat/stream`,
+        headers: async () => {
+          const token = await getAccessToken()
+          return { Authorization: `Bearer ${token}` }
+        },
+      }),
+    []
+  )
 
   const { messages, sendMessage, status, error } = useChat({ transport })
 
@@ -36,7 +40,7 @@ export function ChatPage() {
     const text = input.trim()
     if (!text || isStreaming) return
     setInput('')
-    void sendMessage({ text })
+    sendMessage({ text }).catch(() => {})
   }
 
   return (

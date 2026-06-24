@@ -28,9 +28,9 @@ export function MessageList({ messages }: Props) {
             }`}
           >
             {message.parts
-              .filter((p) => p.type === 'text')
+              .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
               .map((p, i) => (
-                <span key={i}>{(p as { type: 'text'; text: string }).text}</span>
+                <span key={i}>{p.text}</span>
               ))}
           </div>
         </div>
