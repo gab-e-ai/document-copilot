@@ -1,2 +1,9 @@
-// Product-level API calls (threads, messages) — populated in Step 3 (chat plumbing).
-export {}
+import { supabase } from './supabase'
+
+export async function getAccessToken(): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session) throw new Error('Not authenticated')
+  return session.access_token
+}

@@ -17,13 +17,16 @@ _STUB_TEXT = (
 
 
 class ChatMessage(BaseModel):
+    model_config = {"extra": "allow"}
+
     role: str
-    content: str
+    content: str | None = None
 
 
 class ChatStreamRequest(BaseModel):
-    thread_id: str
+    id: str  # chat session id sent by @ai-sdk/react v6 HttpChatTransport
     messages: list[ChatMessage]
+    trigger: str | None = None
 
 
 async def _stream_stub() -> AsyncGenerator[str, None]:
