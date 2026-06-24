@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.config import settings
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 @dataclass
@@ -16,8 +16,13 @@ class AuthUser:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> AuthUser:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authenticated",
+        )
     token = credentials.credentials
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
