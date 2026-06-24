@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -117,8 +118,12 @@ class DocumentChunk(Base):
     chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     # search_vector is a GENERATED ALWAYS AS STORED column managed by Postgres.
-    # Defined here for ORM queries; created via raw SQL in the migration.
-    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
+    # Computed() tells SQLAlchemy never to write to this column.
+    search_vector: Mapped[str | None] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('english', chunk_text)", persisted=True),
+        nullable=True,
+    )
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metadata_json: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(
