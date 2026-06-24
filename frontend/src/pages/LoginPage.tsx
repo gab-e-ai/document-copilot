@@ -18,7 +18,7 @@ export function LoginPage() {
     if (error) {
       setError(error.message)
     } else {
-      navigate('/')
+      navigate('/', { replace: true })
     }
   }
 
