@@ -1,5 +1,6 @@
 import asyncio
 import json
+import uuid
 from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends
@@ -29,22 +30,31 @@ class ChatStreamRequest(BaseModel):
     trigger: str | None = None
 
 
+def _sse(event: dict) -> str:
+    """Format a dict as an SSE data line."""
+    return f"data: {json.dumps(event)}\n\n"
+
+
 async def _stream_stub() -> AsyncGenerator[str, None]:
+    part_id = str(uuid.uuid4())
+
+    # Signal start of a new text part
+    yield _sse({"type": "text-start", "id": part_id})
+
+    # Stream each word as a text-delta
     for word in _STUB_TEXT.split():
-        yield f'0:{json.dumps(word + " ")}\n'
+        yield _sse({"type": "text-delta", "id": part_id, "delta": word + " "})
         await asyncio.sleep(0.02)
-    finish = json.dumps(
-        {
-            "finishReason": "stop",
-            "usage": {"promptTokens": 0, "completionTokens": 0},
-            "isContinued": False,
-        }
-    )
-    yield f"e:{finish}\n"
-    data_finish = json.dumps(
-        {"finishReason": "stop", "usage": {"promptTokens": 0, "completionTokens": 0}}
-    )
-    yield f"d:{data_finish}\n"
+
+    # Close the text part
+    yield _sse({"type": "text-end", "id": part_id})
+
+    # Step and message finish signals
+    yield _sse({"type": "finish-step"})
+    yield _sse({"type": "finish", "finishReason": "stop"})
+
+    # SSE termination sentinel
+    yield "data: [DONE]\n\n"
 
 
 @router.post("/chat/stream")
@@ -54,6 +64,6 @@ async def chat_stream(
 ) -> StreamingResponse:
     return StreamingResponse(
         _stream_stub(),
-        media_type="text/plain; charset=utf-8",
-        headers={"X-Vercel-AI-Data-Stream": "v1"},
+        media_type="text/event-stream",
+        headers={"x-vercel-ai-ui-message-stream": "v1"},
     )
