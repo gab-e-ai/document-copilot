@@ -20,7 +20,7 @@ async def get_current_user(
 ) -> AuthUser:
     token = credentials.credentials
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(
                 f"{settings.supabase_url}/auth/v1/user",
                 headers={
