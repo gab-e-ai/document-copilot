@@ -57,3 +57,9 @@ async def test_network_error_raises_401():
             await get_current_user(_make_creds("any-token"))
 
     assert exc_info.value.status_code == 401
+
+
+async def test_missing_credentials_raises_403():
+    with pytest.raises(HTTPException) as exc_info:
+        await get_current_user(None)
+    assert exc_info.value.status_code == 403

@@ -47,7 +47,7 @@ async def _stream_stub() -> AsyncGenerator[str, None]:
 @router.post("/chat/stream")
 async def chat_stream(
     body: ChatStreamRequest,
-    user: AuthUser = Depends(get_current_user),
+    _user: AuthUser = Depends(get_current_user),
 ) -> StreamingResponse:
     return StreamingResponse(
         _stream_stub(),
