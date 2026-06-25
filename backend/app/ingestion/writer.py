@@ -39,8 +39,12 @@ def ingest_document(
 
     ticker = entry["ticker"]
     company = COMPANY_NAMES.get(ticker, ticker)
-    filing_date = date.fromisoformat(entry["filing_date"])
-    fiscal_year = int(entry["report_date"][:4])
+    _filing_date_str = entry.get("filing_date")
+    if not _filing_date_str:
+        raise ValueError(f"missing filing_date for {entry.get('accession_number', '?')}")
+    filing_date = date.fromisoformat(_filing_date_str)
+    _report_date_str = entry.get("report_date")
+    fiscal_year = int(_report_date_str[:4]) if _report_date_str else None
 
     doc = SourceDocument(
         id=uuid.uuid4(),

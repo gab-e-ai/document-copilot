@@ -37,26 +37,30 @@ def run_pipeline(manifest_path: Path, downloads_dir: Path) -> None:
         accession = entry.get("accession_number", local_path)
         print(f"Processing {entry.get('ticker')} {entry.get('form')} ({accession}) ...", end=" ", flush=True)
 
-        html = html_path.read_text(encoding="utf-8", errors="replace")
-        md = html_to_markdown(html)
-        chunks = chunk_text(md, max_tokens=_MAX_TOKENS, overlap_tokens=_OVERLAP_TOKENS)
-        token_counts = [count_tokens(c) for c in chunks]
-        embeddings = embed_chunks(
-            chunks,
-            client,
-            settings.openai_embedding_model,
-            settings.openai_embedding_dimensions,
-        )
+        try:
+            html = html_path.read_text(encoding="utf-8", errors="replace")
+            md = html_to_markdown(html)
+            chunks = chunk_text(md, max_tokens=_MAX_TOKENS, overlap_tokens=_OVERLAP_TOKENS)
+            token_counts = [count_tokens(c) for c in chunks]
+            embeddings = embed_chunks(
+                chunks,
+                client,
+                settings.openai_embedding_model,
+                settings.openai_embedding_dimensions,
+            )
 
-        with Session(engine) as session:
-            n = ingest_document(entry, md, chunks, embeddings, token_counts, session)
+            with Session(engine) as session:
+                n = ingest_document(entry, md, chunks, embeddings, token_counts, session)
 
-        if n == 0:
-            print("already ingested, skipped.")
-        else:
-            print(f"{n} chunks written.")
-            total_docs += 1
-            total_chunks += n
+            if n == 0:
+                print("already ingested, skipped.")
+            else:
+                print(f"{n} chunks written.")
+                total_docs += 1
+                total_chunks += n
+        except Exception as exc:
+            print(f"  ERROR: {exc}")
+            continue
 
     print(f"\nDone: {total_docs} document(s), {total_chunks} chunk(s) ingested.")
 
