@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import json
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.auth.dependencies import AuthUser, get_current_user
+from app.database.session import get_session
 from app.main import app
 
 
@@ -11,9 +15,14 @@ def _auth_override() -> AuthUser:
     return AuthUser(id="test-user-id", email="analyst@driftwood.com")
 
 
+async def _session_override():
+    yield AsyncMock()
+
+
 @pytest.fixture
 def client():
     app.dependency_overrides[get_current_user] = _auth_override
+    app.dependency_overrides[get_session] = _session_override
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -33,22 +42,50 @@ def test_stream_requires_auth(unauth_client):
 
 
 def test_stream_returns_200_with_ai_sdk_headers(client):
-    response = client.post(
-        "/chat/stream",
-        json={"id": "test-chat-id", "messages": [{"role": "user", "content": "hello"}]},
-        headers={"Authorization": "Bearer fake-token"},
-    )
+    with patch("app.chat.orchestrator.run_agent", AsyncMock(return_value=None)), \
+         patch("app.chat.orchestrator.get_or_create_thread", AsyncMock(return_value=AsyncMock())), \
+         patch("app.chat.orchestrator.save_message", AsyncMock(return_value=__import__("uuid").uuid4())), \
+         patch("app.chat.orchestrator.save_citations", AsyncMock()), \
+         patch("app.chat.orchestrator.AsyncOpenAI"), \
+         patch("app.chat.orchestrator.DocumentRetriever"), \
+         patch("app.chat.orchestrator.GroundingValidator"):
+        from app.assistant.outputs import GroundedAnswer
+        from unittest.mock import MagicMock
+        mock_answer = GroundedAnswer(answer="test answer", citations=[])
+
+        with patch("app.chat.orchestrator.run_agent", AsyncMock(return_value=mock_answer)), \
+             patch("app.chat.orchestrator.GroundingValidator") as mock_val_cls:
+            mock_val_cls.return_value.validate = MagicMock(return_value=mock_answer)
+            response = client.post(
+                "/chat/stream",
+                json={"id": "test-chat-id", "messages": [{"role": "user", "content": "hello"}]},
+                headers={"Authorization": "Bearer fake-token"},
+            )
+
     assert response.status_code == 200
     assert "text/event-stream" in response.headers["content-type"]
     assert response.headers.get("x-vercel-ai-ui-message-stream") == "v1"
 
 
 def test_stream_body_contains_ui_message_stream_parts(client):
-    response = client.post(
-        "/chat/stream",
-        json={"id": "test-chat-id", "messages": [{"role": "user", "content": "hello"}]},
-        headers={"Authorization": "Bearer fake-token"},
-    )
+    from app.assistant.outputs import GroundedAnswer
+    from unittest.mock import MagicMock
+    mock_answer = GroundedAnswer(answer="hello world", citations=[])
+
+    with patch("app.chat.orchestrator.run_agent", AsyncMock(return_value=mock_answer)), \
+         patch("app.chat.orchestrator.get_or_create_thread", AsyncMock(return_value=AsyncMock())), \
+         patch("app.chat.orchestrator.save_message", AsyncMock(return_value=__import__("uuid").uuid4())), \
+         patch("app.chat.orchestrator.save_citations", AsyncMock()), \
+         patch("app.chat.orchestrator.AsyncOpenAI"), \
+         patch("app.chat.orchestrator.DocumentRetriever"), \
+         patch("app.chat.orchestrator.GroundingValidator") as mock_val_cls:
+        mock_val_cls.return_value.validate = MagicMock(return_value=mock_answer)
+        response = client.post(
+            "/chat/stream",
+            json={"id": "test-chat-id", "messages": [{"role": "user", "content": "hello"}]},
+            headers={"Authorization": "Bearer fake-token"},
+        )
+
     lines = response.text.splitlines()
 
     # Every SSE data line starts with "data: "

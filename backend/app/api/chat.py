@@ -1,20 +1,14 @@
-import asyncio
-import json
-import uuid
-from collections.abc import AsyncGenerator
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import AuthUser, get_current_user
+from app.database.session import get_session
 
 router = APIRouter()
-
-_STUB_TEXT = (
-    "This is a stubbed response. "
-    "Full retrieval and LLM integration coming in Step 4."
-)
 
 
 class ChatMessage(BaseModel):
@@ -25,45 +19,22 @@ class ChatMessage(BaseModel):
 
 
 class ChatStreamRequest(BaseModel):
-    id: str  # chat session id sent by @ai-sdk/react v6 HttpChatTransport
+    id: str
     messages: list[ChatMessage]
     trigger: str | None = None
-
-
-def _sse(event: dict) -> str:
-    """Format a dict as an SSE data line."""
-    return f"data: {json.dumps(event)}\n\n"
-
-
-async def _stream_stub() -> AsyncGenerator[str, None]:
-    part_id = str(uuid.uuid4())
-
-    # Signal start of a new text part
-    yield _sse({"type": "text-start", "id": part_id})
-
-    # Stream each word as a text-delta
-    for word in _STUB_TEXT.split():
-        yield _sse({"type": "text-delta", "id": part_id, "delta": word + " "})
-        await asyncio.sleep(0.02)
-
-    # Close the text part
-    yield _sse({"type": "text-end", "id": part_id})
-
-    # Step and message finish signals
-    yield _sse({"type": "finish-step"})
-    yield _sse({"type": "finish", "finishReason": "stop"})
-
-    # SSE termination sentinel
-    yield "data: [DONE]\n\n"
 
 
 @router.post("/chat/stream")
 async def chat_stream(
     body: ChatStreamRequest,
-    _user: AuthUser = Depends(get_current_user),
+    user: AuthUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
+    from app.chat.orchestrator import run_chat_turn
+
+    stream = run_chat_turn(body, user, session)
     return StreamingResponse(
-        _stream_stub(),
+        stream,
         media_type="text/event-stream",
         headers={"x-vercel-ai-ui-message-stream": "v1"},
     )
