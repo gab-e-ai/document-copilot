@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     openai_api_key: str
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = 1536
+    openai_chat_model: str = "gpt-4o-mini"
     # Comma-separated string so env files don't need JSON array syntax.
     # main.py splits this into a list for the CORS middleware.
     allowed_origins: str = "http://localhost:5173"
