@@ -1,0 +1,16 @@
+{
+  "enabledMcpjsonServers": [
+    "github-integration",
+    "filesystem-access",
+    "context7",
+    "deepgraph-react",
+    "deepgraph-typescript",
+    "postgresql-integration",
+    "mysql-integration",
+    "mcp-server-playwright",
+    "web-fetch",
+    "memory-integration",
+    "circleci",
+    "just-mcp"
+  ]
+}

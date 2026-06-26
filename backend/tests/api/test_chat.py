@@ -42,25 +42,23 @@ def test_stream_requires_auth(unauth_client):
 
 
 def test_stream_returns_200_with_ai_sdk_headers(client):
-    with patch("app.chat.orchestrator.run_agent", AsyncMock(return_value=None)), \
+    from app.assistant.outputs import GroundedAnswer
+    from unittest.mock import MagicMock
+    mock_answer = GroundedAnswer(answer="test answer", citations=[])
+
+    with patch("app.chat.orchestrator.run_agent", AsyncMock(return_value=mock_answer)), \
          patch("app.chat.orchestrator.get_or_create_thread", AsyncMock(return_value=AsyncMock())), \
          patch("app.chat.orchestrator.save_message", AsyncMock(return_value=__import__("uuid").uuid4())), \
          patch("app.chat.orchestrator.save_citations", AsyncMock()), \
          patch("app.chat.orchestrator.AsyncOpenAI"), \
          patch("app.chat.orchestrator.DocumentRetriever"), \
-         patch("app.chat.orchestrator.GroundingValidator"):
-        from app.assistant.outputs import GroundedAnswer
-        from unittest.mock import MagicMock
-        mock_answer = GroundedAnswer(answer="test answer", citations=[])
-
-        with patch("app.chat.orchestrator.run_agent", AsyncMock(return_value=mock_answer)), \
-             patch("app.chat.orchestrator.GroundingValidator") as mock_val_cls:
-            mock_val_cls.return_value.validate = MagicMock(return_value=mock_answer)
-            response = client.post(
-                "/chat/stream",
-                json={"id": "test-chat-id", "messages": [{"role": "user", "content": "hello"}]},
-                headers={"Authorization": "Bearer fake-token"},
-            )
+         patch("app.chat.orchestrator.GroundingValidator") as mock_val_cls:
+        mock_val_cls.return_value.validate = MagicMock(return_value=mock_answer)
+        response = client.post(
+            "/chat/stream",
+            json={"id": "test-chat-id", "messages": [{"role": "user", "content": "hello"}]},
+            headers={"Authorization": "Bearer fake-token"},
+        )
 
     assert response.status_code == 200
     assert "text/event-stream" in response.headers["content-type"]
