@@ -7,7 +7,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from app.assistant.deps import DocumentAgentDeps
-from app.assistant.outputs import GroundedAnswer, SourcePassage
+from app.assistant.outputs import GroundedAnswer
 from app.config import settings
 
 _instructions = (Path(__file__).parent / "instructions.md").read_text()
