@@ -1,6 +1,5 @@
-import { HttpChatTransport } from 'ai'
 import { useChat } from '@ai-sdk/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { MessageInput } from '../../components/chat/MessageInput'
 import { MessageList } from '../../components/chat/MessageList'
@@ -11,19 +10,21 @@ export function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
 
-  const transport = useMemo(
-    () =>
-      new HttpChatTransport({
-        api: `${env.apiBaseUrl}/chat/stream`,
-        headers: async () => {
-          const token = await getAccessToken()
-          return { Authorization: `Bearer ${token}` }
-        },
-      }),
-    []
-  )
+  const customFetch = async (input: any, init: any) => {
+    const token = await getAccessToken()
+    return fetch(input, {
+      ...init,
+      headers: {
+        ...init?.headers,
+        Authorization: `Bearer ${token}`,
+      },
+    })
+  }
 
-  const { messages, sendMessage, status, error } = useChat({ transport })
+  const { messages, sendMessage, status, error } = useChat({
+    api: `${env.apiBaseUrl}/chat/stream`,
+    fetch: customFetch as any,
+  } as any)
 
   const isStreaming = status === 'streaming' || status === 'submitted'
 
@@ -43,6 +44,13 @@ export function ChatPage() {
     sendMessage({ text }).catch(() => {})
   }
 
+  function errorMessage(err: Error): string {
+    const msg = err.message ?? ''
+    if (msg.includes('401') || msg.includes('403')) return 'Session expired — please sign in again.'
+    if (msg.includes('502') || msg.includes('500')) return 'The assistant is temporarily unavailable. Please try again.'
+    return 'Something went wrong. Please try again.'
+  }
+
   return (
     <div className="flex flex-col h-screen">
       <header className="border-b px-4 py-3">
@@ -50,8 +58,8 @@ export function ChatPage() {
       </header>
       <MessageList messages={messages} />
       {error && (
-        <p role="alert" className="text-sm text-red-600 px-4 pb-2">
-          {error.message}
+        <p role="alert" className="text-sm text-red-600 px-4 pb-2 text-center">
+          {errorMessage(error)}
         </p>
       )}
       <div ref={bottomRef} />
