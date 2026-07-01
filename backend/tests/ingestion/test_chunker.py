@@ -39,6 +39,16 @@ def test_each_chunk_within_generous_token_bound():
         assert count_tokens(chunk) <= 200
 
 
+def test_single_oversized_paragraph_is_hard_split():
+    # A single paragraph (no double-newline breaks) far larger than max_tokens
+    # must be hard-split so no chunk exceeds the embedding model's input limit.
+    # Regression: previously kept as one giant chunk, rejected by the embeddings API.
+    big_paragraph = "word " * 4000  # ~4000 tokens, no paragraph breaks
+    chunks = chunk_text(big_paragraph, max_tokens=512, overlap_tokens=64)
+    assert len(chunks) > 1
+    assert all(count_tokens(c) <= 512 for c in chunks)
+
+
 def test_empty_string_returns_empty_list():
     assert chunk_text("") == []
 

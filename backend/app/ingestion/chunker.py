@@ -7,6 +7,21 @@ def count_tokens(text: str) -> int:
     return len(_ENCODING.encode(text))
 
 
+def _split_oversized(para: str, max_tokens: int) -> list[str]:
+    """Hard-split a paragraph that alone exceeds max_tokens into token-bounded pieces.
+
+    Prevents any single chunk from exceeding the embedding model's input limit
+    (e.g. a large table rendered as one block with no double-newline breaks).
+    """
+    tokens = _ENCODING.encode(para)
+    if len(tokens) <= max_tokens:
+        return [para]
+    return [
+        _ENCODING.decode(tokens[i : i + max_tokens]).strip()
+        for i in range(0, len(tokens), max_tokens)
+    ]
+
+
 def chunk_text(
     text: str,
     max_tokens: int = 512,
@@ -15,9 +30,13 @@ def chunk_text(
     """Split text into overlapping, token-bounded chunks on paragraph boundaries.
 
     Paragraphs are delimited by double newlines. A paragraph that alone exceeds
-    max_tokens is kept as its own chunk without further splitting.
+    max_tokens is hard-split at the token level so no chunk exceeds max_tokens.
     """
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    paragraphs: list[str] = []
+    for p in text.split("\n\n"):
+        p = p.strip()
+        if p:
+            paragraphs.extend(_split_oversized(p, max_tokens))
     if not paragraphs:
         return []
 
