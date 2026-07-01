@@ -182,10 +182,92 @@ cd frontend && pnpm dev
 
 Visit `http://localhost:5173` → redirects to `/login` → after sign-in, `/chat` shows streaming stub response.
 
-## Step 4 — Retrieval + LLM 📋
+## Step 4 — Ingestion pipeline ✅
 
-Planned. Ingestion pipeline → hybrid search (pgvector + FTS + RRF) → PydanticAI document agent.
+**Complete.** Plan: `docs/superpowers/plans/2026-06-24-ingestion-pipeline.md`
 
-## Step 5 — UI polish 📋
+CLI that reads `data/downloads/manifest.json`, converts SEC HTML filings to Markdown, chunks into 512-token paragraphs with 64-token overlap, embeds via OpenAI `text-embedding-3-small`, and writes `source_documents` + `document_chunks` to Supabase.
 
-Planned. Citation cards, source passage drawers, empty states, error handling.
+```bash
+cd backend
+uv run python -m app.ingestion          # uses data/downloads/ by default
+uv run python -m app.ingestion --manifest path/to/manifest.json
+```
+
+### Backend layout additions
+
+```
+backend/app/ingestion/
+├── html_to_markdown.py   # html2text wrapper
+├── chunker.py            # paragraph-aware token-bounded chunker (512 tok / 64 overlap)
+├── embedder.py           # OpenAI batched embedder (batch=100)
+├── writer.py             # SQLAlchemy idempotent writer (checks accession_number)
+├── pipeline.py           # orchestrator with per-filing error isolation
+└── __main__.py           # CLI entry point
+```
+
+---
+
+## Step 5 — Semantic search, retrieval agent & citation UI ✅
+
+**Complete.** Plan: `docs/superpowers/plans/2026-06-25-semantic-search-retrieval-agent.md`
+
+Replaces the `/chat/stream` stub with a real hybrid retrieval pipeline:
+- **pgvector semantic search** + **Postgres full-text search** fused with **Reciprocal Rank Fusion**
+- **PydanticAI document agent** (`gpt-4o-mini`) with `search_filings` tool and typed `GroundedAnswer` output
+- **Citation grounding validator** — raises `GroundingError` if model cites unretrieved passages
+- **SSE streaming** — answer text + `message-annotation` citation events
+- **Citation cards** in the frontend (company, filing type, date, excerpt)
+
+### Backend layout additions
+
+```
+backend/app/
+├── schemas/chat.py           # ChatMessage, ChatStreamRequest (shared, no circular import)
+├── retrieval/
+│   ├── queries.py            # pgvector + tsvector SQL (async)
+│   ├── fusion.py             # Reciprocal Rank Fusion
+│   └── retriever.py          # DocumentRetriever: embed → search → fuse → SourcePassage list
+├── assistant/
+│   ├── outputs.py            # SourcePassage, Citation, GroundedAnswer (Pydantic)
+│   ├── deps.py               # DocumentAgentDeps dataclass
+│   ├── agent.py              # PydanticAI Agent with search_filings tool
+│   └── instructions.md       # System prompt / product contract
+├── grounding/
+│   └── validator.py          # GroundingValidator + GroundingError
+├── chat/
+│   ├── messages.py           # WireMessage, extract_user_query
+│   ├── streaming.py          # SSE helpers, stream_answer_and_citations
+│   └── orchestrator.py       # run_chat_turn: retrieve → agent → validate → stream → persist
+└── database/
+    ├── session.py            # async engine (psycopg_async) + get_session FastAPI dep
+    └── chats.py              # get_or_create_thread, save_message, save_citations
+```
+
+### Frontend layout additions
+
+```
+frontend/src/components/chat/
+└── CitationCard.tsx          # renders one citation (index, company, filing, date, excerpt)
+```
+
+`MessageList.tsx` updated to extract `message.annotations` and render citation cards under assistant messages. `ChatPage.tsx` updated with context-aware error messages.
+
+### Config additions
+
+`backend/.env` — add:
+```
+OPENAI_CHAT_MODEL=gpt-4o-mini    # optional, defaults to gpt-4o-mini
+```
+
+### Running
+
+```bash
+# Backend:
+cd backend && uv run uvicorn app.main:app --reload --port 8000
+
+# Frontend:
+cd frontend && npm run dev
+```
+
+Visit `http://localhost:5173` → sign in → ask a question about the ingested SEC filings.

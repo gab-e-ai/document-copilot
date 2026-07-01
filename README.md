@@ -47,9 +47,21 @@ Install these before setting up `backend/` or `frontend/`:
 
 You also need accounts/keys for external services once the app is wired up. Start with [docs/guides/supabase-setup.md](docs/guides/supabase-setup.md) (account + project), then create an [OpenAI API key](https://platform.openai.com/api-keys) when the LLM layer is wired up.
 
+## What's built
+
+| Step | Status | What it does |
+|------|--------|--------------|
+| 1 — Backend skeleton + DB schema | ✅ | FastAPI, SQLAlchemy models, Alembic migration, pgvector + full-text indexes |
+| 2 — Auth wiring | ✅ | Supabase email auth, JWT verification, protected routes |
+| 3 — Chat UI (stub) | ✅ | AI SDK v6 streaming chat, FastAPI `/chat/stream` endpoint |
+| 4 — Ingestion pipeline | ✅ | HTML→Markdown, chunker, OpenAI embedder, Supabase writer |
+| 5 — Retrieval agent + citation UI | ✅ | pgvector + FTS + RRF, PydanticAI agent, grounding validator, citation cards |
+
+See [README_setup.md](README_setup.md) for per-step details and running instructions.
+
 ## Running locally
 
-To be added during the build. Setup guides:
+Setup guides:
 
 - [Supabase](docs/guides/supabase-setup.md) — account, hosted project (dashboard or CLI)
 - [Backend](docs/guides/backend-setup.md)
