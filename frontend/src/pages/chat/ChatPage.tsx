@@ -1,5 +1,6 @@
 import { useChat } from '@ai-sdk/react'
-import { useEffect, useRef, useState } from 'react'
+import { DefaultChatTransport } from 'ai'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { MessageInput } from '../../components/chat/MessageInput'
 import { MessageList } from '../../components/chat/MessageList'
@@ -10,21 +11,25 @@ export function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
 
-  const customFetch = async (input: any, init: any) => {
-    const token = await getAccessToken()
-    return fetch(input, {
-      ...init,
-      headers: {
-        ...init?.headers,
-        Authorization: `Bearer ${token}`,
-      },
-    })
-  }
+  // AI SDK v6 routes requests through a transport; the top-level `api`/`fetch`
+  // options are ignored. DefaultChatTransport lets us point at the backend and
+  // inject the Supabase bearer token per request.
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: `${env.apiBaseUrl}/chat/stream`,
+        fetch: async (input, init) => {
+          const token = await getAccessToken()
+          return fetch(input, {
+            ...init,
+            headers: { ...init?.headers, Authorization: `Bearer ${token}` },
+          })
+        },
+      }),
+    [],
+  )
 
-  const { messages, sendMessage, status, error } = useChat({
-    api: `${env.apiBaseUrl}/chat/stream`,
-    fetch: customFetch as any,
-  } as any)
+  const { messages, sendMessage, status, error } = useChat({ transport })
 
   const isStreaming = status === 'streaming' || status === 'submitted'
 

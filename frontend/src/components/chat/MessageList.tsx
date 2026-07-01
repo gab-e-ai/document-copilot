@@ -16,11 +16,11 @@ interface Props {
 
 function extractCitations(message: UIMessage): CitationData[] {
   if (message.role !== 'assistant') return []
-  const annotations = (message as any).annotations
-  if (!annotations) return []
-  for (const ann of annotations) {
-    const a = ann as { citations?: CitationData[] }
-    if (Array.isArray(a?.citations)) return a.citations
+  // Citations arrive as an AI SDK v5+ data part: { type: 'data-citations', data: { citations } }.
+  for (const part of message.parts as Array<{ type: string; data?: { citations?: CitationData[] } }>) {
+    if (part.type === 'data-citations' && Array.isArray(part.data?.citations)) {
+      return part.data.citations
+    }
   }
   return []
 }

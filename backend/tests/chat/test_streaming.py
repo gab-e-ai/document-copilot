@@ -15,6 +15,21 @@ def test_extract_user_query_returns_last_user_message():
     assert extract_user_query(messages) == "Follow-up question"
 
 
+def test_extract_user_query_reads_ai_sdk_parts():
+    from app.chat.messages import WireMessage, extract_user_query
+
+    # AI SDK v5+ UIMessage shape: text lives in `parts`, not `content`.
+    messages = [
+        WireMessage.model_validate(
+            {
+                "role": "user",
+                "parts": [{"type": "text", "text": "What was Apple's revenue in 2024?"}],
+            }
+        )
+    ]
+    assert extract_user_query(messages) == "What was Apple's revenue in 2024?"
+
+
 def test_extract_user_query_raises_when_no_user_message():
     from app.chat.messages import WireMessage, extract_user_query
 
@@ -75,21 +90,24 @@ async def test_stream_answer_includes_all_words():
 
 
 @pytest.mark.asyncio
-async def test_stream_answer_sends_annotation_when_citations_present():
+async def test_stream_answer_sends_citations_data_part_when_present():
     from app.chat.streaming import stream_answer_and_citations
 
     citation = {"chunk_id": "c1", "excerpt": "Revenue was $90B.", "company": "Apple Inc."}
-    types = []
+    payloads = []
     async for chunk in stream_answer_and_citations("Answer [1].", [citation]):
         if chunk.startswith("data: {"):
-            payload = json.loads(chunk[len("data: "):-2])
-            types.append(payload["type"])
+            payloads.append(json.loads(chunk[len("data: "):-2]))
 
-    assert "message-annotation" in types
+    types = [p["type"] for p in payloads]
+    # AI SDK v5+ custom data part carrying citations.
+    assert "data-citations" in types
+    data_part = next(p for p in payloads if p["type"] == "data-citations")
+    assert data_part["data"]["citations"] == [citation]
 
 
 @pytest.mark.asyncio
-async def test_stream_answer_no_annotation_without_citations():
+async def test_stream_answer_no_citations_data_part_without_citations():
     from app.chat.streaming import stream_answer_and_citations
 
     types = []
@@ -98,4 +116,4 @@ async def test_stream_answer_no_annotation_without_citations():
             payload = json.loads(chunk[len("data: "):-2])
             types.append(payload["type"])
 
-    assert "message-annotation" not in types
+    assert "data-citations" not in types

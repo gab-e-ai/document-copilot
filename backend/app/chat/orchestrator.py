@@ -31,7 +31,9 @@ async def run_chat_turn(
     user: AuthUser,
     session: AsyncSession,
 ) -> AsyncGenerator[str, None]:
-    wire_messages = [WireMessage(role=m.role, content=m.content) for m in body.messages]
+    # Preserve extra fields (e.g. AI SDK UIMessage `parts`) so the query can be
+    # extracted regardless of whether the client sends `content` or `parts`.
+    wire_messages = [WireMessage.model_validate(m.model_dump()) for m in body.messages]
     user_query = extract_user_query(wire_messages)
 
     thread_id = body.id

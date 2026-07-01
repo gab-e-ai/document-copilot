@@ -21,12 +21,9 @@ async def stream_answer_and_citations(
     yield sse({"type": "text-end", "id": part_id})
 
     if citations:
-        yield sse(
-            {
-                "type": "message-annotation",
-                "message-annotations": [{"citations": citations}],
-            }
-        )
+        # AI SDK v5+ custom data part: lands in message.parts as
+        # {type: "data-citations", data: {citations: [...]}}.
+        yield sse({"type": "data-citations", "data": {"citations": citations}})
 
     yield sse({"type": "finish-step"})
     yield sse({"type": "finish", "finishReason": "stop"})
