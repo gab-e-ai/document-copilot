@@ -1,27 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import AuthUser, get_current_user
 from app.database.session import get_session
+from app.schemas.chat import ChatStreamRequest
 
 router = APIRouter()
-
-
-class ChatMessage(BaseModel):
-    model_config = {"extra": "allow"}
-
-    role: str
-    content: str | None = None
-
-
-class ChatStreamRequest(BaseModel):
-    id: str
-    messages: list[ChatMessage]
-    trigger: str | None = None
 
 
 @router.post("/chat/stream")
@@ -32,7 +21,7 @@ async def chat_stream(
 ) -> StreamingResponse:
     from app.chat.orchestrator import run_chat_turn
 
-    stream = run_chat_turn(body, user, session)
+    stream: AsyncGenerator[str, None] = await run_chat_turn(body, user, session)
     return StreamingResponse(
         stream,
         media_type="text/event-stream",

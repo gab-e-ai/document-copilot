@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 def _make_body(text: str = "What was Apple revenue?"):
     import uuid
-    from app.api.chat import ChatStreamRequest, ChatMessage
+    from app.schemas.chat import ChatStreamRequest, ChatMessage
     return ChatStreamRequest(
         id=str(uuid.uuid4()),
         messages=[ChatMessage(role="user", content=text)],
@@ -57,7 +57,8 @@ async def test_run_chat_turn_yields_sse_events():
         mock_val_cls.return_value.validate = MagicMock(return_value=mock_answer)
 
         events = []
-        async for chunk in run_chat_turn(_make_body(), _make_user(), mock_session):
+        stream = await run_chat_turn(_make_body(), _make_user(), mock_session)
+        async for chunk in stream:
             events.append(chunk)
 
     assert any("text-delta" in e for e in events)
@@ -65,7 +66,7 @@ async def test_run_chat_turn_yields_sse_events():
 
 
 @pytest.mark.asyncio
-async def test_run_chat_turn_calls_save_message(mock_for_turn=None):
+async def test_run_chat_turn_calls_save_message():
     from app.assistant.outputs import GroundedAnswer
     from app.chat.orchestrator import run_chat_turn
 
@@ -89,7 +90,8 @@ async def test_run_chat_turn_calls_save_message(mock_for_turn=None):
         patch("app.chat.orchestrator.save_citations", AsyncMock()),
     ):
         mock_val_cls.return_value.validate = MagicMock(return_value=mock_answer)
-        async for _ in run_chat_turn(_make_body(), _make_user(), mock_session):
+        stream = await run_chat_turn(_make_body(), _make_user(), mock_session)
+        async for _ in stream:
             pass
 
     assert save_message_mock.call_count >= 1

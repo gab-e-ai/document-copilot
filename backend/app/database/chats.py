@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.assistant.outputs import Citation
@@ -24,10 +25,18 @@ async def get_or_create_thread(
     if existing is not None:
         return existing
 
-    thread = ChatThread(id=uuid.UUID(thread_id), user_id=uuid.UUID(user_id))
-    session.add(thread)
-    await session.flush()
-    return thread
+    try:
+        thread = ChatThread(id=uuid.UUID(thread_id), user_id=uuid.UUID(user_id))
+        session.add(thread)
+        await session.flush()
+        return thread
+    except IntegrityError:
+        await session.rollback()
+        return (
+            await session.execute(
+                select(ChatThread).where(ChatThread.id == uuid.UUID(thread_id))
+            )
+        ).scalar_one()
 
 
 async def save_message(
