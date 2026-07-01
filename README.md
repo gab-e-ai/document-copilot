@@ -56,8 +56,11 @@ You also need accounts/keys for external services once the app is wired up. Star
 | 3 — Chat UI (stub) | ✅ | AI SDK v6 streaming chat, FastAPI `/chat/stream` endpoint |
 | 4 — Ingestion pipeline | ✅ | HTML→Markdown, chunker, OpenAI embedder, Supabase writer |
 | 5 — Retrieval agent + citation UI | ✅ | pgvector + FTS + RRF, PydanticAI agent, grounding validator, citation cards |
+| 6 — End-to-end verification | ✅ | Full flow tested in-browser (login → streamed answer → citation card); AI SDK v6 wiring, DB, and ingestion bugs fixed; corpus populated |
 
 See [README_setup.md](README_setup.md) for per-step details and running instructions.
+
+**Status:** the app works end-to-end locally. To try it: start the backend and frontend (below), sign in, and ask a question about the SEC filings. Corpus is already populated.
 
 ## Running locally
 

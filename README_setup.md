@@ -55,7 +55,7 @@ RLS: enabled on all user-owned tables; corpus tables (`source_documents`, `docum
 | `SUPABASE_URL` | Dashboard → Settings → API → Project URL |
 | `SUPABASE_ANON_KEY` | Dashboard → Settings → API → anon public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Dashboard → Settings → API → service_role secret |
-| `DATABASE_URL` | Dashboard → Settings → Database → **Session** connection string (host `db.<ref>.supabase.co:5432`). Do NOT use the pooler URL. |
+| `DATABASE_URL` | Dashboard → Settings → Database → connection string. **Use the Session pooler** (`aws-0-<region>.pooler.supabase.com:5432`, user `postgres.<ref>`). The direct host `db.<ref>.supabase.co` is IPv6-only and unreachable on IPv4-only networks. The Session pooler (port 5432) is IPv4 and works for both the app and Alembic migrations. Do NOT use the Transaction pooler (port 6543) for migrations. See Step 6. |
 | `OPENAI_API_KEY` | platform.openai.com |
 | `ALLOWED_ORIGINS` | Comma-separated, e.g. `http://localhost:5173` |
 
@@ -271,3 +271,33 @@ cd frontend && npm run dev
 ```
 
 Visit `http://localhost:5173` → sign in → ask a question about the ingested SEC filings.
+
+---
+
+## Step 6 — End-to-end verification & fixes ✅
+
+The full stack was tested end-to-end in the browser (login → streamed answer → citation card). Several bugs that passed the build and unit tests but broke the running app were found and fixed.
+
+### Bugs fixed
+
+| Area | Problem | Fix |
+|------|---------|-----|
+| Backend deps | `greenlet` was missing; SQLAlchemy async crashes on the first DB query. Unit tests mock the DB, so they never caught it. | Declared `sqlalchemy[asyncio]` in `pyproject.toml` (pulls in `greenlet`). |
+| Ingestion | A single paragraph larger than the model limit (e.g. a big table) was sent whole to OpenAI → embedding API rejected it → MSFT/GOOGL/AMZN filings failed. | `chunker.py` now hard-splits oversized paragraphs at the token level. |
+| DB connection | `DATABASE_URL` pointed at the IPv6-only direct host → unreachable on IPv4 networks. | Switched to the Session pooler (see Step 1 table). |
+| Frontend | AI SDK v6: `useChat({ api, fetch })` is ignored → requests went to `/api/chat` with no auth. | Use `DefaultChatTransport({ api, fetch })` in `ChatPage.tsx`. |
+| Backend | AI SDK v6 sends message text in `parts`, not `content` → "No user message found". | `extract_user_query` reads both; orchestrator preserves `parts`. |
+| Citations | Backend emitted a `message-annotation` event, which is not a valid AI SDK v6 stream part → error banner + citations dropped. | Emit a `data-citations` data part; frontend reads it from `message.parts`. |
+
+### Corpus & security
+
+- **Corpus populated:** ran `uv run python -m app.ingestion` → 25 filings, ~4,900 chunks (AAPL, MSFT, NVDA, AMZN, GOOGL × 5 years).
+- **RLS enabled** on `document_chunks`, `source_documents`, `alembic_version` (they were exposed to the anon key). The backend uses the `postgres` role, which bypasses RLS, so retrieval is unaffected.
+
+### Local dev note
+
+If Vite's default port `5173` is taken it uses `5174` — add both to `ALLOWED_ORIGINS` in `backend/.env`, e.g. `http://localhost:5173,http://localhost:5174`.
+
+### Restricted networks
+
+Some corporate/ISP networks firewall outbound Postgres ports (5432/6543) — every DB call times out while HTTPS works. If that happens, use a different network (e.g. a mobile hotspot) or run against the deployment.
